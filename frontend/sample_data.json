@@ -1,0 +1,89 @@
+{
+  "one_driver": {
+    "branch": { "lat": 9.983782, "lon": 123.469749 },
+    "targets": [
+      { "id": "T001", "lat": 11.150155, "lon": 123.464052, "stay_minutes": 85, "required": true, "time_window": null },
+      { "id": "T002", "lat": 10.673416, "lon": 124.102555, "stay_minutes": 71, "required": true, "time_window": null },
+      { "id": "T003", "lat": 11.252224, "lon": 123.477931, "stay_minutes": 83, "required": true, "time_window": [534, 667] },
+      { "id": "T004", "lat": 11.023363, "lon": 123.602964, "stay_minutes": 86, "required": false, "time_window": null },
+      { "id": "T005", "lat": 11.233813, "lon": 123.72186, "stay_minutes": 47, "required": true, "time_window": [736, 907] }
+    ],
+    "targets_by_id": {
+      "T001": { "lat": 11.150155, "lon": 123.464052, "stay_minutes": 85 },
+      "T002": { "lat": 10.673416, "lon": 124.102555, "stay_minutes": 71 },
+      "T003": { "lat": 11.252224, "lon": 123.477931, "stay_minutes": 83 },
+      "T004": { "lat": 11.023363, "lon": 123.602964, "stay_minutes": 86 },
+      "T005": { "lat": 11.233813, "lon": 123.72186, "stay_minutes": 47 }
+    },
+    "schedules": [
+      {
+        "date": "2024-12-12",
+        "routes": [
+          {
+            "driver_id": "A",
+            "travel_minutes": 120,
+            "stay_minutes": 200,
+            "overtime_minutes": 0,
+            "stops": [
+              { "target_id": "T001", "arrival_min": 480, "depart_min": 565, "travel_minutes": 30, "stay_minutes": 85 },
+              { "target_id": "T003", "arrival_min": 600, "depart_min": 683, "travel_minutes": 35, "stay_minutes": 83 },
+              { "target_id": "T005", "arrival_min": 720, "depart_min": 767, "travel_minutes": 37, "stay_minutes": 47 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "three_driver": {
+    "branch": { "lat": 9.983782, "lon": 123.469749 },
+    "targets": [
+      { "id": "T001", "lat": 11.150155, "lon": 123.464052, "stay_minutes": 85, "required": true, "time_window": null },
+      { "id": "T002", "lat": 10.673416, "lon": 124.102555, "stay_minutes": 71, "required": true, "time_window": null },
+      { "id": "T003", "lat": 11.252224, "lon": 123.477931, "stay_minutes": 83, "required": true, "time_window": [534, 667] },
+      { "id": "T004", "lat": 11.023363, "lon": 123.602964, "stay_minutes": 86, "required": false, "time_window": null },
+      { "id": "T005", "lat": 11.233813, "lon": 123.72186, "stay_minutes": 47, "required": true, "time_window": [736, 907] }
+    ],
+    "targets_by_id": {
+      "T001": { "lat": 11.150155, "lon": 123.464052, "stay_minutes": 85 },
+      "T002": { "lat": 10.673416, "lon": 124.102555, "stay_minutes": 71 },
+      "T003": { "lat": 11.252224, "lon": 123.477931, "stay_minutes": 83 },
+      "T004": { "lat": 11.023363, "lon": 123.602964, "stay_minutes": 86 },
+      "T005": { "lat": 11.233813, "lon": 123.72186, "stay_minutes": 47 }
+    },
+    "schedules": [
+      {
+        "date": "2024-12-12",
+        "routes": [
+          {
+            "driver_id": "A",
+            "travel_minutes": 60,
+            "stay_minutes": 85,
+            "overtime_minutes": 0,
+            "stops": [
+              { "target_id": "T001", "arrival_min": 480, "depart_min": 565, "travel_minutes": 30, "stay_minutes": 85 }
+            ]
+          },
+          {
+            "driver_id": "B",
+            "travel_minutes": 40,
+            "stay_minutes": 71,
+            "overtime_minutes": 0,
+            "stops": [
+              { "target_id": "T002", "arrival_min": 500, "depart_min": 571, "travel_minutes": 20, "stay_minutes": 71 }
+            ]
+          },
+          {
+            "driver_id": "C",
+            "travel_minutes": 80,
+            "stay_minutes": 130,
+            "overtime_minutes": 0,
+            "stops": [
+              { "target_id": "T003", "arrival_min": 520, "depart_min": 603, "travel_minutes": 25, "stay_minutes": 83 },
+              { "target_id": "T005", "arrival_min": 650, "depart_min": 697, "travel_minutes": 22, "stay_minutes": 47 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

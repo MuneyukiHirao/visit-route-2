@@ -1,0 +1,1 @@
+npm not available: 'Could not determine Node.js install directory'. Node version v22.14.0 present; need npm path or install to run Jest.

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VRP Demo</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">VRP Demo</div>
+    <div class="controls">
+      <label>Preset
+        <select id="preset">
+          <option value="one">1名 (A)</option>
+          <option value="three">3名 (A,B,C)</option>
+        </select>
+      </label>
+      <label>速度(km/h)
+        <input type="number" id="speed" value="40" min="5" max="120" />
+      </label>
+      <label>Solver秒数
+        <input type="number" id="solveSeconds" value="1" min="1" max="300" />
+      </label>
+      <button id="solveBtn">Solve</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>ターゲット数
+      <input type="number" id="targetCount" value="20" min="1" max="100" />
+    </label>
+    <button id="applyTargetCountBtn">適用</button>
+    <label><input type="checkbox" id="labelsToggle" /> ラベル常時表示</label>
+    <label>開始日
+      <input type="date" id="startDate" />
+    </label>
+    <label><input type="checkbox" id="singleDay" /> 単日で計算</label>
+    <label>日付</label>
+    <div class="date-toggle-wrap">
+      <button id="dateSelectAll" class="chip-btn">全選択</button>
+      <button id="dateSelectNone" class="chip-btn">全解除</button>
+      <div id="dateToggles" class="driver-toggles"></div>
+    </div>
+    <div id="driverToggles" class="driver-toggles"></div>
+  </div>
+
+  <main class="grid">
+    <section class="map-panel">
+      <div id="map" class="map"></div>
+      <div class="legend">
+        <span class="chip required">必須</span>
+        <span class="chip optional">任意</span>
+        <span class="chip branch">支店</span>
+      </div>
+    </section>
+    <section class="tabs">
+      <div class="tab-buttons">
+        <button class="tab-btn active" data-tab="schedule">スケジュール</button>
+        <button class="tab-btn" data-tab="coords">ターゲット</button>
+        <button class="tab-btn" data-tab="raw">RAW</button>
+      </div>
+      <div class="tab-content active" id="tab-schedule">
+        <div id="schedule"></div>
+      </div>
+      <div class="tab-content" id="tab-coords">
+        <div id="coords"></div>
+      </div>
+      <div class="tab-content" id="tab-raw">
+        <pre id="raw"></pre>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <div class="spinner-overlay" id="spinnerOverlay">
+    <div class="spinner"></div>
+  </div>
+</body>
+</html>
