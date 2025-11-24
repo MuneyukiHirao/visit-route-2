@@ -215,3 +215,51 @@ test("calendar renders one column per driver per day", () => {
     expect(cols.length).toBe(drivers.size);
   });
 });
+
+test("calendar groups multiple routes of the same driver into a single column", () => {
+  const window = buildDom();
+  const plan = {
+    targets: [],
+    targets_by_id: {},
+    schedules: [
+      {
+        date: "2024-12-12",
+        routes: [
+          {
+            driver_id: "A",
+            stops: [{ target_id: "X1", arrival_min: 480, depart_min: 500, travel_minutes: 10, stay_minutes: 20 }],
+            travel_minutes: 10,
+            stay_minutes: 20,
+            end_time: 500,
+            return_travel_minutes: 5,
+          },
+          {
+            driver_id: "A",
+            stops: [{ target_id: "X2", arrival_min: 520, depart_min: 530, travel_minutes: 15, stay_minutes: 10 }],
+            travel_minutes: 15,
+            stay_minutes: 10,
+            end_time: 530,
+            return_travel_minutes: 5,
+          },
+          {
+            driver_id: "B",
+            stops: [{ target_id: "Y1", arrival_min: 600, depart_min: 610, travel_minutes: 12, stay_minutes: 10 }],
+            travel_minutes: 12,
+            stay_minutes: 10,
+            end_time: 610,
+            return_travel_minutes: 5,
+          },
+        ],
+        unassigned: [],
+      },
+    ],
+  };
+  window.state.plan = plan;
+  window.buildFilters(plan);
+  window.state.scheduleView = "calendar";
+  window.renderSchedule();
+  const cols = window.document.querySelectorAll(".cal-day .cal-driver-col");
+  const names = Array.from(window.document.querySelectorAll(".cal-driver-name")).map((el) => el.textContent.trim());
+  expect(cols.length).toBe(2);
+  expect(names).toEqual(["A", "B"]);
+});

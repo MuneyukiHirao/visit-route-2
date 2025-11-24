@@ -120,6 +120,20 @@ function renderMap() {
     });
   }
 
+  const comboColor = {};
+  const getColor = (date, driver) => {
+    const key = `${date}-${driver}`;
+    if (!comboColor[key]) {
+      const dateIdx = Object.keys(dateColorMap).indexOf(date);
+      const base = dateIdx >= 0 ? dateColorMap[date] : dateColors[0];
+      // blend with driver color by simple selection from driver palette
+      const drvColor = driverColors[Math.abs(driver.charCodeAt(0)) % driverColors.length];
+      // alternate by concatenating pattern (keeps distinct enough on map)
+      comboColor[key] = drvColor || base;
+    }
+    return comboColor[key];
+  };
+
   state.currentTargets.forEach((t) => {
     const icon = L.divIcon({
       className: t.required ? "target-marker req" : "target-marker opt",
@@ -154,7 +168,6 @@ function renderMap() {
         : state.plan.schedules.filter((d) => d.date === state.filterDate);
     filteredSchedules.forEach((day, dayIdx) => {
       if (state.filterDate === "ALL" && dateVisibility[day.date] === false) return;
-      const dayColor = state.filterDate === "ALL" ? dateColorMap[day.date] : dateColors[dayIdx % dateColors.length];
       day.routes.forEach((route) => {
         if (!state.driverFilter.has(route.driver_id)) return;
         if (!route.stops || route.stops.length === 0) return;
@@ -164,6 +177,10 @@ function renderMap() {
           points.push([t.lat, t.lon]);
         });
         points.push([state.branch.lat, state.branch.lon]);
+        const dayColor =
+          state.filterDate === "ALL"
+            ? getColor(day.date, route.driver_id)
+            : getColor(day.date, route.driver_id) || dateColors[dayIdx % dateColors.length];
         const line = L.polyline(points, {
           color: dayColor,
           weight: 3,
@@ -384,10 +401,18 @@ function renderCalendarView(filteredSchedules) {
 
   const daysHtml = filteredSchedules
     .map((d) => {
-      const driverCols = d.routes
-        .map((r) => {
-          if (!state.driverFilter.has(r.driver_id)) return "";
-          const segments = buildRouteSegments(r)
+      // Group routes by driver to avoid duplicate columns for the same driver.
+      const routesByDriver = {};
+      d.routes.forEach((r) => {
+        if (!state.driverFilter.has(r.driver_id)) return;
+        routesByDriver[r.driver_id] = routesByDriver[r.driver_id] || [];
+        routesByDriver[r.driver_id].push(r);
+      });
+
+      const driverCols = Object.entries(routesByDriver)
+        .map(([driverId, routes]) => {
+          const segments = routes
+            .flatMap((r) => buildRouteSegments(r))
             .map((seg) => {
               const start = Math.max(windowStart, seg.start);
               const end = Math.min(windowEnd, seg.end);
@@ -398,11 +423,11 @@ function renderCalendarView(filteredSchedules) {
                 seg.type === "stay" ? "cal-block stay" : seg.type === "travel" ? "cal-block travel" : "cal-block return";
               const dataTarget = seg.target_id ? `data-target="${seg.target_id}"` : "";
               const label = `${minutesToHHMM(seg.start)}-${minutesToHHMM(seg.end)} ${seg.label}`;
-              return `<div class="${cls}" style="top:${top}px;height:${height}px;" ${dataTarget} data-date="${d.date}" data-driver="${r.driver_id}"><span>${label}</span></div>`;
+              return `<div class="${cls}" style="top:${top}px;height:${height}px;" ${dataTarget} data-date="${d.date}" data-driver="${driverId}"><span>${label}</span></div>`;
             })
             .join("");
           return `<div class="cal-driver-col">
-            <div class="cal-driver-name">${r.driver_id}</div>
+            <div class="cal-driver-name">${driverId}</div>
             <div class="cal-timeline">${segments}</div>
           </div>`;
         })

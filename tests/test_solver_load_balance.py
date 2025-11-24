@@ -102,6 +102,47 @@ def test_three_drivers_all_utilized_and_no_unassigned():
         assert count <= 25
 
 
+def test_late_day_requires_full_previous_day_100_targets():
+    dates = make_dates(5)
+    branch = {"lat": 10.0, "lon": 123.0}
+    targets = make_targets(100)
+    drivers_by_date = {
+        d: [
+            {"id": "A", "start_time": 8 * 60, "end_time": 19 * 60},
+            {"id": "B", "start_time": 8 * 60, "end_time": 19 * 60},
+            {"id": "C", "start_time": 8 * 60, "end_time": 19 * 60},
+        ]
+        for d in dates
+    }
+
+    plan = build_global_plan(
+        dates=dates,
+        branch=branch,
+        drivers_by_date=drivers_by_date,
+        targets=targets,
+        speed_kmph=40.0,
+        max_solve_seconds=5,
+    )
+
+    total_stops = sum(len(r.get("stops", [])) for sched in plan["schedules"] for r in sched.get("routes", []))
+    assert total_stops == len(targets)
+    assert not plan.get("unassigned")
+
+    used_days = [sched["date"] for sched in plan["schedules"] if any(r.get("stops") for r in sched.get("routes", []))]
+    used_days.sort()
+    if len(used_days) > 1:
+        last = used_days[-1]
+        prev = used_days[-2]
+        drivers_prev = {
+            r["driver_id"]
+            for sched in plan["schedules"]
+            if sched["date"] == prev
+            for r in sched.get("routes", [])
+            if r.get("stops")
+        }
+        assert {"A", "B", "C"}.issubset(drivers_prev)
+
+
 def assert_backfill_rule(plan, dates, drivers):
     """If a driver has any schedule on day N, then all drivers must have schedules on all previous used days."""
     day_to_used_drivers = {d: set() for d in dates}

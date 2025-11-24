@@ -73,7 +73,8 @@ def _extract_routes(
                 target = data["targets"][node_index - 1]
                 time_var = time_dimension.CumulVar(index)
                 arrival = solution.Value(time_var)
-                travel = max(0, arrival - prev_depart_time)  # includes travel + waiting from previous depart
+                # Use matrix-based travel to avoid counting waiting time as travel.
+                travel = data["time_matrix"][prev_node][node_index]
                 depart = arrival + target["stay_minutes"]
                 stops.append(
                     {
@@ -95,7 +96,7 @@ def _extract_routes(
         to_node = manager.IndexToNode(end_index)
         # Arrival at end and travel from last depart to end
         end_arrival = solution.Value(time_dimension.CumulVar(end_index))
-        return_travel = max(0, end_arrival - prev_depart_time)
+        return_travel = data["time_matrix"][prev_node][to_node]
         total_travel += return_travel
         end_time = solution.Value(time_dimension.CumulVar(end_index))
 
@@ -201,10 +202,17 @@ def build_daily_plan(config: Dict[str, Any], targets: List[Dict[str, Any]]) -> D
 
     # Search parameters
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     search_parameters.time_limit.FromSeconds(max_solve_seconds)
+    search_parameters.use_full_propagation = True
     search_parameters.log_search = False
+    # Encourage better diversification
+    search_parameters.guided_local_search_lambda_coefficient = 0.1
+
+    # Minimize end times to reduce unnecessary detours.
+    for v in range(len(drivers)):
+        routing.AddVariableMinimizedByFinalizer(time_dimension.CumulVar(routing.End(v)))
 
     solution = routing.SolveWithParameters(search_parameters)
     if solution:
@@ -347,14 +355,20 @@ def build_global_plan(
     )
     time_dimension = routing.GetDimensionOrDie("Time")
 
-    # Capacity dimension to limit stops per vehicle (encourage multi-driver usage).
+    # Capacity dimension to limit stops per vehicle (encourage multi-driver usage) for multi-vehicle cases.
     demands = [0] + [1] * len(expanded_targets)
     def demand_callback(from_index: int) -> int:
         node = manager.IndexToNode(from_index)
         return demands[node]
     demand_idx = routing.RegisterUnaryTransitCallback(demand_callback)
-    # Smaller capacity per vehicle encourages the solver to spread work across drivers/days.
-    capacities = [max_stops_per_vehicle] * len(vehicles)
+    # For single-vehicle case, allow all; for multi-vehicle, cap modestly to encourage spreading.
+    if len(vehicles) == 1:
+        capacities = [len(expanded_targets) + 1]
+    else:
+        dynamic_capacity = max_stops_per_vehicle
+        if len(expanded_targets) > 50 and len(dates) > 1:
+            dynamic_capacity = min(max(dynamic_capacity, 20), 25)
+        capacities = [dynamic_capacity] * len(vehicles)
     routing.AddDimensionWithVehicleCapacity(demand_idx, 0, capacities, True, "Capacity")
 
     # Node time windows
@@ -366,15 +380,13 @@ def build_global_plan(
         routing.AddToAssignment(time_dimension.CumulVar(idx))
 
     # Vehicle start/end windows
-    # Encourage using vehicles (drivers) mildly; avoid making problem infeasible.
     for v, vehicle in enumerate(vehicles):
         start = routing.Start(v)
         end = routing.End(v)
         time_dimension.CumulVar(start).SetRange(vehicle["start"], vehicle["start"])
         time_dimension.CumulVar(end).SetRange(vehicle["start"], vehicle["end"])
-        # Mild bonus for using earlier-day drivers to promote front-loading and multi-driver usage.
-        activation_bonus = 50 * (len(dates) - vehicle["day_idx"])
-        routing.SetFixedCostOfVehicle(-activation_bonus, v)
+        # No fixed cost penalty so vehicles can be used when beneficial.
+        routing.SetFixedCostOfVehicle(0, v)
 
     # Visit count priority: very large penalties, and only one clone (per day) may be visited for the same base_id
     # Penalties must stay within safe int range for OR-Tools; keep large to force assignment.
@@ -392,9 +404,10 @@ def build_global_plan(
     time_dimension.SetSpanCostCoefficientForAllVehicles(0)
 
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
-    search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+    search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.TABU_SEARCH
     search_parameters.time_limit.FromSeconds(max_solve_seconds)
+    search_parameters.use_full_propagation = True
     search_parameters.log_search = False
 
     solution = routing.SolveWithParameters(search_parameters)
@@ -533,22 +546,22 @@ def build_global_plan(
 
     # Post-fix: ensure earliest used day includes all available drivers if later days are used
     used_days = [d for d in dates if any(r.get("stops") for r in schedules[d]["routes"])]
-    if len(used_days) >= 2:
+    if used_days:
         first_day = used_days[0]
-        later_days = used_days[1:]
         available_first = {drv["id"] for drv in drivers_by_date.get(first_day, [])}
         present_first = {r["driver_id"] for r in schedules[first_day]["routes"] if r.get("stops")}
         missing = list(available_first - present_first)
         if missing:
-            # Prefer to pull one stop per missing driver from later days (last stop of each route), then from day1 multi-stop routes.
+            # donors from later days first, then from any route with >1 stop
             donor_slots = []
-            for d in later_days:
+            for d in used_days[1:]:
                 for ri, r in enumerate(schedules[d]["routes"]):
                     if r.get("stops"):
                         donor_slots.append((d, ri, -1))
-            for ri, r in enumerate(schedules[first_day]["routes"]):
-                if len(r.get("stops", [])) > 1:
-                    donor_slots.append((first_day, ri, -1))
+            for d in used_days:
+                for ri, r in enumerate(schedules[d]["routes"]):
+                    if len(r.get("stops", [])) > 1:
+                        donor_slots.append((d, ri, -1))
 
             donor_idx = 0
             for drv_id in missing:
@@ -586,53 +599,175 @@ def build_global_plan(
                         "return_travel_minutes": 0.0,
                     }
                 )
-
-    # If only one day is used but not all available drivers are present, split stops within that day.
-    elif len(used_days) == 1:
-        first_day = used_days[0]
-        available_first = [drv["id"] for drv in drivers_by_date.get(first_day, [])]
-        present_first = [r["driver_id"] for r in schedules[first_day]["routes"] if r.get("stops")]
-        missing = [d for d in available_first if d not in present_first]
-        if missing:
-            # donors: routes on the same day with more than one stop, sorted by length descending
-            donor_routes = [
-                (idx, r) for idx, r in enumerate(schedules[first_day]["routes"]) if len(r.get("stops", [])) > 1
-            ]
-            donor_routes.sort(key=lambda x: len(x[1].get("stops", [])), reverse=True)
-            donor_idx = 0
-            for drv_id in missing:
-                if donor_idx >= len(donor_routes):
-                    break
-                ri, route = donor_routes[donor_idx]
-                donor_idx += 1
-                stop = route["stops"].pop()  # move last stop
-                route["stay_minutes"] = max(0.0, route.get("stay_minutes", 0.0) - stop.get("stay_minutes", 0.0))
-                # place at start time of the new driver
-                drv_info = next((drv for drv in drivers_by_date.get(first_day, []) if drv["id"] == drv_id), None)
-                if not drv_info:
-                    continue
-                offset = date_to_offset[first_day]
-                arrival = offset + drv_info["start_time"]
-                depart = min(offset + drv_info["end_time"], arrival + stop["stay_minutes"])
-                schedules[first_day]["routes"].append(
-                    {
-                        "driver_id": drv_id,
-                        "stops": [
+            # if still missing and no donors available, steal one stop from the longest route on first_day
+            if donor_idx < len(missing):
+                longest_route = None
+                longest_len = 0
+                for ri, r in enumerate(schedules[first_day]["routes"]):
+                    l = len(r.get("stops", []))
+                    if l >= longest_len:
+                        longest_len = l
+                        longest_route = (ri, r)
+                if longest_route and longest_len > 0:
+                    ri, route = longest_route
+                    stop = route["stops"].pop()  # move one stop
+                    route["stay_minutes"] = max(0.0, route.get("stay_minutes", 0.0) - stop.get("stay_minutes", 0.0))
+                    missing_rest = missing[donor_idx:]
+                    for drv_id in missing_rest:
+                        drv_info = next((drv for drv in drivers_by_date.get(first_day, []) if drv["id"] == drv_id), None)
+                        if not drv_info:
+                            continue
+                        offset = date_to_offset[first_day]
+                        arrival = offset + drv_info["start_time"]
+                        depart = min(offset + drv_info["end_time"], arrival + stop["stay_minutes"])
+                        schedules[first_day]["routes"].append(
                             {
-                                "target_id": stop["target_id"],
-                                "arrival_min": float(arrival),
-                                "depart_min": float(depart),
+                                "driver_id": drv_id,
+                                "stops": [
+                                    {
+                                        "target_id": stop["target_id"],
+                                        "arrival_min": float(arrival),
+                                        "depart_min": float(depart),
+                                        "travel_minutes": 0.0,
+                                        "stay_minutes": float(stop["stay_minutes"]),
+                                    }
+                                ],
                                 "travel_minutes": 0.0,
                                 "stay_minutes": float(stop["stay_minutes"]),
+                                "end_time": float(depart),
+                                "overtime_minutes": 0.0,
+                                "return_travel_minutes": 0.0,
                             }
-                        ],
-                        "travel_minutes": 0.0,
-                        "stay_minutes": float(stop["stay_minutes"]),
-                        "end_time": float(depart),
-                        "overtime_minutes": 0.0,
-                        "return_travel_minutes": 0.0,
-                    }
-                )
+                        )
+                        break
+
+    # Local 2-opt heuristic for routes without any time windows to reduce travel distance (single day offsets applied)
+    def optimize_route_order(route: Dict[str, Any], driver_start: float, driver_end: float) -> Dict[str, Any]:
+        stops = route.get("stops", [])
+        if len(stops) < 3:
+            return route
+        if any(
+            base_targets[s["target_id"]].get("time_window") or base_targets[s["target_id"]].get("datetime_window")
+            for s in stops
+        ):
+            return route
+
+        coords = [branch_pt] + [(base_targets[s["target_id"]]["lat"], base_targets[s["target_id"]]["lon"]) for s in stops] + [branch_pt]
+        dist = [[travel_time_minutes(haversine_km(a, b), speed_kmph) for b in coords] for a in coords]
+
+        m = len(stops)
+        order = list(range(1, m + 1))
+        if m <= 20:
+            # exact TSP with DP (depot at index 0, return to depot)
+            ALL = 1 << m
+            dp = [[math.inf] * m for _ in range(ALL)]
+            parent = [[-1] * m for _ in range(ALL)]
+            for j in range(m):
+                dp[1 << j][j] = dist[0][j + 1]
+            for mask in range(ALL):
+                for j in range(m):
+                    if not (mask & (1 << j)):
+                        continue
+                    cost = dp[mask][j]
+                    if cost == math.inf:
+                        continue
+                    for k in range(m):
+                        if mask & (1 << k):
+                            continue
+                        nmask = mask | (1 << k)
+                        new_cost = cost + dist[j + 1][k + 1]
+                        if new_cost < dp[nmask][k]:
+                            dp[nmask][k] = new_cost
+                            parent[nmask][k] = j
+            best_cost = math.inf
+            last = -1
+            full = ALL - 1
+            for j in range(m):
+                c = dp[full][j] + dist[j + 1][0]
+                if c < best_cost:
+                    best_cost = c
+                    last = j
+            # reconstruct
+            mask = full
+            seq = []
+            while last != -1:
+                seq.append(last)
+                prev = parent[mask][last]
+                mask ^= 1 << last
+                last = prev if mask else -1
+            seq.reverse()
+            order = [s + 1 for s in seq]  # convert to coords index (1-based for stops)
+        else:
+            # 2-opt heuristic with multiple passes
+            for _ in range(3):
+                improved = True
+                while improved:
+                    improved = False
+                    for i in range(len(order) - 1):
+                        for j in range(i + 2, len(order)):
+                            if j == len(order) - 1 and i == 0:
+                                continue
+                            a, b = order[i - 1] if i > 0 else 0, order[i]
+                            c, d = order[j], order[j + 1] if j + 1 < len(order) else len(coords) - 1
+                            before = dist[a][b] + dist[c][d]
+                            after = dist[a][c] + dist[b][d]
+                            if after + 1e-6 < before:
+                                order[i:j + 1] = reversed(order[i:j + 1])
+                                improved = True
+                                break
+                        if improved:
+                            break
+
+        # Rebuild route with new order
+        current = driver_start
+        new_stops = []
+        travel_total = 0.0
+        stay_total = 0.0
+        prev_coord = branch_pt
+        for idx in order:
+            t_id = stops[idx - 1]["target_id"]
+            t = base_targets[t_id]
+            travel = travel_time_minutes(haversine_km(prev_coord, (t["lat"], t["lon"])), speed_kmph)
+            arrival = current + travel
+            depart = arrival + t.get("stay_minutes", 0)
+            new_stops.append(
+                {
+                    "target_id": t_id,
+                    "arrival_min": float(arrival),
+                    "depart_min": float(depart),
+                    "travel_minutes": float(travel),
+                    "stay_minutes": float(t.get("stay_minutes", 0)),
+                }
+            )
+            travel_total += travel
+            stay_total += t.get("stay_minutes", 0)
+            current = depart
+            prev_coord = (t["lat"], t["lon"])
+
+        return_travel = travel_time_minutes(haversine_km(prev_coord, branch_pt), speed_kmph)
+        travel_total += return_travel
+        current += return_travel
+        return {
+            **route,
+            "stops": new_stops,
+            "travel_minutes": float(travel_total - return_travel),
+            "stay_minutes": float(stay_total),
+            "return_travel_minutes": float(return_travel),
+            "end_time": float(current),
+            "overtime_minutes": max(0.0, current - driver_end),
+        }
+
+    driver_time_map = {
+        d: {drv["id"]: (date_to_offset[d] + drv["start_time"], date_to_offset[d] + drv["end_time"]) for drv in drv_list}
+        for d, drv_list in drivers_by_date.items()
+    }
+    for sched in schedules.values():
+        for idx, r in enumerate(sched["routes"]):
+            times = driver_time_map.get(sched["date"], {}).get(r["driver_id"])
+            if not times:
+                continue
+            optimized = optimize_route_order(r, times[0], times[1])
+            sched["routes"][idx] = optimized
 
     return {
         "status": "success",
