@@ -1,54 +1,69 @@
 # VRP Route Planner (Frontend + Backend)
 
-訪問計画（VRP）を 1 週間分作成するデモアプリです。Python/Flask バックエンドと HTML/JS (Leaflet) フロントエンドで構成されています。
+This project is a demo web app to build 1-week visit plans (VRP/VRPTW) with a Python/Flask backend and a Leaflet-based frontend. It optimizes required visits first, then maximizes visit count, then minimizes total travel time, while respecting time windows when provided.
 
-## 主な機能
-- Google OR-Tools による VRPTW：必須優先 → 訪問件数最大化 → 移動時間最小化。時間枠（日付付き/無し）を厳守。
-- Cebu 島ポリゴン内でターゲットをランダム生成（必須/時間枠の付与率や滞在時間も乱数）。
-- 地図でドラッグして座標編集、ラベル常時/ホバー切替、矢印付きルート表示、日付・ドライバーごとの表示切替。
-- ターゲット数変更、時間枠一括クリア、開始日の平日シフト、単日計算/複数日計算の切替。
-- カレンダー表示（ドライバー×日で列固定）、リスト表示（時間枠参照列あり）、RAW 出力。
+## Features
+- **Solver (OR-Tools VRPTW)**  
+  - Priority: required targets → visit count max → travel time min.  
+  - Time windows (date/time) strictly enforced when present; optional targets can be dropped with penalties.  
+  - Multi-day, multi-driver: each day/driver is a vehicle with its own working hours.  
+  - Fallback + local improvements: route-level TSP optimization (exact DP for small routes, 2-opt heuristic otherwise).
+- **Data generation**  
+  - Targets randomly generated inside Cebu island polygon, stay time randomized, required/time-window ratios configurable.  
+  - Start date auto-shift to next weekday; 5 business-day range when multi-day.  
+  - Time windows can be date-attached; rebase to chosen start date.
+- **Frontend (Leaflet + vanilla JS)**  
+  - Map with draggable targets, label always/hover toggle, colored routes with arrows, per-day/driver visibility toggles.  
+  - Schedule view: list (time-window reference) and calendar (driver × day columns, work/full-day toggle).  
+  - Target table: edit stay/required/time-window, clear all time windows, target count adjust, start-date shift.  
+  - RAW JSON view; status and spinner for solve progress.  
+  - All UI labels centralized in `frontend/labels.js` (for easy localization), bound via `data-label` in HTML.
 
-## セットアップ
+## Setup
 ```bash
-# バックエンド
+# Backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 
-# フロントエンド
+# Frontend
 cd frontend
 npm install
 ```
 
-## 起動
+## Run
 ```bash
-# API サーバ (Flask)
+# API server (Flask)
 python scripts/api_server.py
 
-# フロントエンドは index.html をローカルサーブ（例: VSCode Live Server など）
+# Frontend: open frontend/index.html (e.g., with VSCode Live Server)
 ```
-- デフォルト solver 秒数は 1 秒（UI から変更可）。開始日は今日基準で平日 5 日を生成（週末は次平日にシフト）。
-- `/api/targets?count=<n>&start_date=YYYY-MM-DD` でターゲット生成。
+- Default solver seconds = 1 (editable in UI).  
+- Start date defaults to today; if weekend, shift to the next weekday; multi-day uses 5 business days.  
+- `/api/targets?count=<n>&start_date=YYYY-MM-DD` to generate targets.
 
-## テスト
+## Tests
 ```bash
-# ルートから一括
-npm test          # backend(pytest) -> frontend(jest)
+# All (backend then frontend)
+npm test
 
-# 個別
-python -m pytest  # backend
-cd frontend && npm test  # frontend
+# Backend only
+python -m pytest
+
+# Frontend only
+cd frontend && npm test
 ```
-- 回帰テストには大規模シナリオ（最大 100 件）が含まれるため、数分かかることがあります。
-- solver の探索時間は max_solve_seconds（基本 5〜10 秒）に制限しています。
+- Some regression/load-balance tests use large scenarios (up to 100 targets) and can take a couple of minutes.  
+- Solver search time is capped by `max_solve_seconds` (typically 5–10 seconds in tests).
 
-## ディレクトリ
-- `src/vrp/` … ソルバー、距離計算、データ生成
-- `scripts/api_server.py` … Flask API
-- `frontend/` … UI, Jest テスト
-- `tests/` … Python テスト（ロードバランス/回帰/シナリオ）
+## Project Structure
+- `src/vrp/` – solver, geo utilities, data generation  
+- `scripts/api_server.py` – Flask API server  
+- `frontend/` – UI code (Leaflet, vanilla JS), Jest tests, `labels.js` for centralized labels  
+- `tests/` – Python tests (load-balance, regression, scenarios)
 
-## メモ
-- ネットワーク制限環境では `git push` 等が制限される場合があります。
-- `.pytest_cache` などキャッシュ類はコミット対象外推奨です。
+## Notes
+- Network-restricted environments may block `git push` or npm registry access; run in an allowed environment.  
+- Cache folders like `.pytest_cache` should be excluded from commits.  
+- UI labels are managed in `frontend/labels.js`; HTML uses `data-label` to bind text.  
+- Solver tuning: adjust `max_solve_seconds`, capacities, and search strategies in `src/vrp/solver.py` as needed for performance vs. quality. 

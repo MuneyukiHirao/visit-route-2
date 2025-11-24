@@ -12,6 +12,16 @@ const state = {
   calendarFullDay: false,
 };
 
+const LABELS = window.LABELS || {};
+function applyStaticLabels() {
+  const s = LABELS.static || {};
+  Object.entries(s).forEach(([key, text]) => {
+    document.querySelectorAll(`[data-label="${key}"]`).forEach((el) => {
+      el.textContent = text;
+    });
+  });
+}
+
 let map;
 let layers = [];
 let tileLayer;
@@ -231,12 +241,12 @@ function renderSchedule() {
 
   const viewTabs = `<div class="schedule-view-tabs">
     <div class="tab-buttons">
-      <button class="${state.scheduleView === "list" ? "active" : ""}" data-view="list">リスト</button>
-      <button class="${state.scheduleView === "calendar" ? "active" : ""}" data-view="calendar">カレンダー</button>
+      <button class="${state.scheduleView === "list" ? "active" : ""}" data-view="list">${LABELS.scheduleView.list}</button>
+      <button class="${state.scheduleView === "calendar" ? "active" : ""}" data-view="calendar">${LABELS.scheduleView.calendar}</button>
     </div>
     <div class="calendar-mode">
-      <button id="calWorkBtn" class="chip-btn small ${!state.calendarFullDay ? "active" : ""}">規定時間</button>
-      <button id="calFullBtn" class="chip-btn small ${state.calendarFullDay ? "active" : ""}">Full day</button>
+      <button id="calWorkBtn" class="chip-btn small ${!state.calendarFullDay ? "active" : ""}">${LABELS.calendarMode.work}</button>
+      <button id="calFullBtn" class="chip-btn small ${state.calendarFullDay ? "active" : ""}">${LABELS.calendarMode.full}</button>
     </div>
   </div>`;
 
@@ -333,11 +343,11 @@ function renderScheduleTable(filteredSchedules) {
     .join(" / ");
 
   const unassignedHtml = allUnassigned.length ? `<div class="unassigned">Unassigned: ${allUnassigned.join(", ")}</div>` : "";
-  const summaryHtml = `<div class="travel-summary">合計移動時間: ${totalTravelMinutes.toFixed(1)}分${travelSummary ? `（${travelSummary}）` : ""}</div>
-  <div class="visit-summary">合計訪問数: ${totalVisits}件${visitSummary ? `（${visitSummary}）` : ""}</div>`;
+  const summaryHtml = `<div class="travel-summary">${LABELS.summary.travel}: ${totalTravelMinutes.toFixed(1)}分${travelSummary ? `（${travelSummary}）` : ""}</div>
+  <div class="visit-summary">${LABELS.summary.visits}: ${totalVisits}件${visitSummary ? `（${visitSummary}）` : ""}</div>`;
 
   return `<table>
-    <thead><tr><th>Date</th><th>Driver</th><th>Seq</th><th>Target</th><th>Arrival</th><th>Departure</th><th>Travel</th><th>Stay</th><th>Time Window</th></tr></thead>
+    <thead><tr><th>${LABELS.scheduleHeaders.date}</th><th>${LABELS.scheduleHeaders.driver}</th><th>${LABELS.scheduleHeaders.seq}</th><th>${LABELS.scheduleHeaders.target}</th><th>${LABELS.scheduleHeaders.arrival}</th><th>${LABELS.scheduleHeaders.departure}</th><th>${LABELS.scheduleHeaders.travel}</th><th>${LABELS.scheduleHeaders.stay}</th><th>${LABELS.scheduleHeaders.timeWindow}</th></tr></thead>
     <tbody>${days}</tbody>
   </table>
   ${unassignedHtml}
@@ -464,7 +474,7 @@ function renderCoords() {
     </td>
   </tr>`).join("");
   container.innerHTML = `${clearBtn}<table>
-    <thead><tr><th>ID</th><th>Lat</th><th>Lon</th><th>滞在</th><th>必須</th><th>時間枠（日付付き）</th></tr></thead>
+    <thead><tr><th>${LABELS.coordsHeaders.id}</th><th>${LABELS.coordsHeaders.lat}</th><th>${LABELS.coordsHeaders.lon}</th><th>${LABELS.coordsHeaders.stay}</th><th>${LABELS.coordsHeaders.required}</th><th>${LABELS.coordsHeaders.timeWindow}</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
   const clearTwBtn = container.querySelector("#clearTimeWindows");
@@ -663,6 +673,7 @@ function rerender() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  applyStaticLabels();
   setStartDateToday();
   setupTabs();
   document.getElementById("solveBtn").addEventListener("click", () => {
