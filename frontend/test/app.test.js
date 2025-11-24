@@ -198,3 +198,20 @@ test("applyTargetCount limits number of currentTargets", () => {
   window.applyTargetCount();
   expect(window.state.currentTargets.length).toBe(2);
 });
+
+test("calendar renders one column per driver per day", () => {
+  const window = buildDom();
+  window.state.plan = sample.three_driver;
+  window.state.plan.targets_by_id = sample.three_driver.targets_by_id;
+  window.buildFilters(sample.three_driver);
+  window.state.scheduleView = "calendar";
+  window.renderSchedule();
+  const dayEls = Array.from(window.document.querySelectorAll(".cal-day"));
+  expect(dayEls.length).toBeGreaterThan(0);
+  dayEls.forEach((dayEl, idx) => {
+    const cols = dayEl.querySelectorAll(".cal-driver-col");
+    // unique drivers for that day
+    const drivers = new Set(sample.three_driver.schedules[idx].routes.map((r) => r.driver_id));
+    expect(cols.length).toBe(drivers.size);
+  });
+});

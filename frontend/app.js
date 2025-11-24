@@ -8,6 +8,8 @@ const state = {
   filterDate: "ALL",
   driverFilter: new Set(),
   showLabelsAlways: false,
+  scheduleView: "list",
+  calendarFullDay: false,
 };
 
 let map;
@@ -204,11 +206,55 @@ function formatWindow(target) {
   return "-";
 }
 
+
 function renderSchedule() {
   const container = document.getElementById("schedule");
   if (!container || !state.plan) return;
   const filteredSchedules = state.plan.schedules.filter((d) => dateVisibility[d.date] !== false);
 
+  const viewTabs = `<div class="schedule-view-tabs">
+    <div class="tab-buttons">
+      <button class="${state.scheduleView === "list" ? "active" : ""}" data-view="list">リスト</button>
+      <button class="${state.scheduleView === "calendar" ? "active" : ""}" data-view="calendar">カレンダー</button>
+    </div>
+    <div class="calendar-mode">
+      <button id="calWorkBtn" class="chip-btn small ${!state.calendarFullDay ? "active" : ""}">規定時間</button>
+      <button id="calFullBtn" class="chip-btn small ${state.calendarFullDay ? "active" : ""}">Full day</button>
+    </div>
+  </div>`;
+
+  const listHtml = renderScheduleTable(filteredSchedules);
+  const calendarHtml = renderCalendarView(filteredSchedules);
+  const bodyHtml = state.scheduleView === "calendar" ? calendarHtml : listHtml;
+  container.innerHTML = `${viewTabs}<div id="scheduleContent">${bodyHtml}</div>`;
+
+  container.querySelectorAll(".schedule-view-tabs button[data-view]").forEach((btn) => {
+    btn.onclick = () => {
+      state.scheduleView = btn.dataset.view;
+      renderSchedule();
+    };
+  });
+  const workBtn = document.getElementById("calWorkBtn");
+  const fullBtn = document.getElementById("calFullBtn");
+  if (workBtn && fullBtn) {
+    workBtn.onclick = () => {
+      state.calendarFullDay = false;
+      renderSchedule();
+    };
+    fullBtn.onclick = () => {
+      state.calendarFullDay = true;
+      renderSchedule();
+    };
+  }
+
+  if (state.scheduleView === "calendar") {
+    container.querySelectorAll(".cal-block[data-target]").forEach((el) => {
+      el.addEventListener("click", () => highlightTarget(el.dataset.target));
+    });
+  }
+}
+
+function renderScheduleTable(filteredSchedules) {
   const days = filteredSchedules
     .map((d) => {
       const rows = d.routes
@@ -237,16 +283,7 @@ function renderSchedule() {
     })
     .join("");
 
-  container.innerHTML = `<table>
-    <thead><tr><th>Date</th><th>Driver</th><th>Seq</th><th>Target</th><th>Arrival</th><th>Departure</th><th>Travel</th><th>Stay</th><th>Time Window</th></tr></thead>
-    <tbody>${days}</tbody>
-  </table>`;
-
   const allUnassigned = filteredSchedules.flatMap((d) => d.unassigned || []);
-  if (allUnassigned.length) {
-    container.innerHTML += `<div class="unassigned">Unassigned: ${allUnassigned.join(", ")}</div>`;
-  }
-
   const totalTravelMinutes = filteredSchedules.reduce(
     (accDay, d) =>
       accDay +
@@ -263,7 +300,6 @@ function renderSchedule() {
   const travelSummary = Object.entries(driverTravelTotals)
     .map(([id, m]) => `${id}: ${m.toFixed(1)}分`)
     .join(" / ");
-  container.innerHTML += `<div class="travel-summary">合計移動時間: ${totalTravelMinutes.toFixed(1)}分${travelSummary ? `（${travelSummary}）` : ""}</div>`;
 
   const totalVisits = filteredSchedules.reduce(
     (acc, d) => acc + d.routes.reduce((accR, r) => accR + (r.stops?.length || 0), 0),
@@ -278,8 +314,112 @@ function renderSchedule() {
   const visitSummary = Object.entries(driverVisits)
     .map(([id, n]) => `${id}: ${n}件`)
     .join(" / ");
-  container.innerHTML += `<div class="visit-summary">合計訪問数: ${totalVisits}件${visitSummary ? `（${visitSummary}）` : ""}</div>`;
+
+  const unassignedHtml = allUnassigned.length ? `<div class="unassigned">Unassigned: ${allUnassigned.join(", ")}</div>` : "";
+  const summaryHtml = `<div class="travel-summary">合計移動時間: ${totalTravelMinutes.toFixed(1)}分${travelSummary ? `（${travelSummary}）` : ""}</div>
+  <div class="visit-summary">合計訪問数: ${totalVisits}件${visitSummary ? `（${visitSummary}）` : ""}</div>`;
+
+  return `<table>
+    <thead><tr><th>Date</th><th>Driver</th><th>Seq</th><th>Target</th><th>Arrival</th><th>Departure</th><th>Travel</th><th>Stay</th><th>Time Window</th></tr></thead>
+    <tbody>${days}</tbody>
+  </table>
+  ${unassignedHtml}
+  ${summaryHtml}`;
 }
+
+function buildRouteSegments(route) {
+  const segments = [];
+  let lastDepart = null;
+  const toLocal = (v) => {
+    const m = v % (24 * 60);
+    return m < 0 ? m + 24 * 60 : m;
+  };
+  if (!route.stops) return segments;
+  route.stops.forEach((s) => {
+    const travelStart = s.arrival_min - (s.travel_minutes || 0);
+    if (!Number.isNaN(travelStart)) {
+      segments.push({
+        type: "travel",
+        target_id: s.target_id,
+        start: toLocal(travelStart),
+        end: toLocal(s.arrival_min),
+        label: `移動→${s.target_id}`,
+      });
+    }
+    segments.push({
+      type: "stay",
+      target_id: s.target_id,
+      start: toLocal(s.arrival_min),
+      end: toLocal(s.depart_min),
+      label: `滞在 ${s.target_id}`,
+    });
+    lastDepart = s.depart_min;
+  });
+  if (lastDepart != null && route.return_travel_minutes) {
+    segments.push({
+      type: "return",
+      target_id: null,
+      start: toLocal(lastDepart),
+      end: toLocal(lastDepart + route.return_travel_minutes),
+      label: "Return",
+    });
+  }
+  return segments;
+}
+
+function renderCalendarView(filteredSchedules) {
+  const windowStart = state.calendarFullDay ? 0 : 8 * 60;
+  const windowEnd = state.calendarFullDay ? 24 * 60 : 19 * 60;
+  const span = Math.max(1, windowEnd - windowStart);
+  const pxPerMinute = state.calendarFullDay ? 0.8 : 1.0;
+  const timelineHeight = span * pxPerMinute;
+  const heightVar = `--cal-height:${timelineHeight}px;`;
+
+  const hourTicks = [];
+  for (let h = windowStart; h <= windowEnd; h += 60) {
+    const top = (h - windowStart) * pxPerMinute;
+    hourTicks.push(`<div class="cal-hour" style="top:${top}px;">${String(Math.floor(h / 60)).padStart(2, "0")}:00</div>`);
+  }
+  const hourHtml = `<div class="cal-hours">${hourTicks.join("")}</div>`;
+
+  const daysHtml = filteredSchedules
+    .map((d) => {
+      const driverCols = d.routes
+        .map((r) => {
+          if (!state.driverFilter.has(r.driver_id)) return "";
+          const segments = buildRouteSegments(r)
+            .map((seg) => {
+              const start = Math.max(windowStart, seg.start);
+              const end = Math.min(windowEnd, seg.end);
+              if (end <= start) return "";
+              const top = (start - windowStart) * pxPerMinute;
+              const height = Math.max(4, (end - start) * pxPerMinute);
+              const cls =
+                seg.type === "stay" ? "cal-block stay" : seg.type === "travel" ? "cal-block travel" : "cal-block return";
+              const dataTarget = seg.target_id ? `data-target="${seg.target_id}"` : "";
+              const label = `${minutesToHHMM(seg.start)}-${minutesToHHMM(seg.end)} ${seg.label}`;
+              return `<div class="${cls}" style="top:${top}px;height:${height}px;" ${dataTarget} data-date="${d.date}" data-driver="${r.driver_id}"><span>${label}</span></div>`;
+            })
+            .join("");
+          return `<div class="cal-driver-col">
+            <div class="cal-driver-name">${r.driver_id}</div>
+            <div class="cal-timeline">${segments}</div>
+          </div>`;
+        })
+        .join("");
+      return `<div class="cal-day">
+        <div class="cal-day-header">${d.date}</div>
+        <div class="cal-grid" style="${heightVar}">
+          ${hourHtml}
+          <div class="cal-drivers">${driverCols}</div>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  return `<div class="calendar-view">${daysHtml}</div>`;
+}
+
 
 function renderCoords() {
   const container = document.getElementById("coords");
@@ -324,11 +464,15 @@ function renderRaw() {
 }
 
 function buildFilters(plan) {
+  Object.keys(dateVisibility).forEach((k) => delete dateVisibility[k]); // reset for new plan
   const dateToggleWrap = document.getElementById("dateToggles");
   if (dateToggleWrap) {
     dateToggleWrap.innerHTML = plan.schedules
       .map((d) => `<label class="driver-chip"><input type="checkbox" data-date="${d.date}" ${dateVisibility[d.date] !== false ? "checked" : ""}/> ${d.date}</label>`)
       .join("");
+    plan.schedules.forEach((d) => {
+      if (dateVisibility[d.date] === undefined) dateVisibility[d.date] = true;
+    });
     const dateCbs = Array.from(dateToggleWrap.querySelectorAll("input[type=checkbox]"));
     const syncCb = () => {
       dateCbs.forEach((cb) => {
@@ -567,8 +711,10 @@ function clearRowHighlights() {
 
 function highlightTarget(targetId) {
   clearRowHighlights();
+  clearCalendarHighlights();
   const row = document.querySelector(`#schedule tbody tr[data-target="${targetId}"]`);
   if (row) row.classList.add("row-highlight");
+  document.querySelectorAll(`.cal-block[data-target="${targetId}"]`).forEach((el) => el.classList.add("cal-highlight"));
   const marker = markerById.get(targetId);
   if (marker) {
     marker.openTooltip();
@@ -585,6 +731,10 @@ function highlightFromMap(targetId) {
   if (schedBtn) schedBtn.classList.add("active");
   document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
   if (schedTab) schedTab.classList.add("active");
+}
+
+function clearCalendarHighlights() {
+  document.querySelectorAll(".cal-block").forEach((el) => el.classList.remove("cal-highlight"));
 }
 
 function addArrows(points, color) {

@@ -1,0 +1,76 @@
+{
+  "status": "success",
+  "dates": [
+    "2025-11-23",
+    "2025-11-24",
+    "2025-11-25"
+  ],
+  "schedules": [
+    {
+      "status": "success",
+      "date": "2025-11-23",
+      "routes": [
+        {
+          "driver_id": "A",
+          "stops": [
+            {
+              "target_id": "T001",
+              "arrival_min": 480.0,
+              "depart_min": 490.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 10.0
+            },
+            {
+              "target_id": "T002",
+              "arrival_min": 490.0,
+              "depart_min": 500.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 10.0
+            },
+            {
+              "target_id": "T003",
+              "arrival_min": 500.0,
+              "depart_min": 510.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 10.0
+            },
+            {
+              "target_id": "T004",
+              "arrival_min": 510.0,
+              "depart_min": 520.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 10.0
+            },
+            {
+              "target_id": "T005",
+              "arrival_min": 520.0,
+              "depart_min": 530.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 10.0
+            }
+          ],
+          "travel_minutes": 0.0,
+          "stay_minutes": 50.0,
+          "end_time": 530.0,
+          "overtime_minutes": 0.0,
+          "return_travel_minutes": 0.0
+        }
+      ],
+      "unassigned": []
+    },
+    {
+      "status": "success",
+      "date": "2025-11-24",
+      "routes": [],
+      "unassigned": []
+    },
+    {
+      "status": "success",
+      "date": "2025-11-25",
+      "routes": [],
+      "unassigned": []
+    }
+  ],
+  "unassigned": [],
+  "warnings": []
+}

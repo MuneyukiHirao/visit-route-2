@@ -75,6 +75,25 @@ button:hover { opacity: 0.9; }
 }
 .chip-btn:hover { border-color: var(--accent); }
 .chip-btn.small { padding: 4px 8px; font-size: 12px; }
+.date-toggle-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.driver-row { display: flex; align-items: center; gap: 6px; }
+
+.calendar-view { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.cal-day { background: var(--panel); padding: 8px; border: 1px solid var(--border); border-radius: 8px; width: 100%; min-width: 320px; }
+.cal-day-header { font-weight: 600; margin-bottom: 6px; }
+.cal-grid { display: grid; grid-template-columns: 60px 1fr; gap: 8px; }
+.cal-hours { position: relative; border-right: 1px solid var(--border); height: var(--cal-height); }
+.cal-hour { position: absolute; left: 0; right: 0; border-top: 1px dashed #223; font-size: 10px; color: var(--muted); padding-top: 2px; }
+.cal-drivers { display: flex; gap: 8px; overflow-x: auto; align-items: stretch; }
+.cal-driver-col { min-width: 180px; position: relative; border: 1px solid var(--border); border-radius: 6px; background: #0b1220; display: flex; flex-direction: column; }
+.cal-driver-name { position: sticky; top: 0; background: rgba(0,0,0,0.4); padding: 4px 6px; font-weight: 600; z-index: 2; }
+.cal-timeline { position: relative; height: var(--cal-height); }
+.cal-block { position: absolute; left: 4px; right: 4px; border-radius: 4px; padding: 2px 4px; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.cal-block span { pointer-events: none; }
+.cal-block.travel { background: #3b82f6; }
+.cal-block.stay { background: #22c55e; }
+.cal-block.return { background: #9ca3af; color: #000; }
+.cal-highlight { outline: 2px solid #f59e0b; }
 .map-panel { position: relative; background: var(--panel); }
 .map { height: 100%; width: 100%; }
 .legend {
@@ -105,6 +124,10 @@ button:hover { opacity: 0.9; }
 .tw-inline input[type="time"] { min-width: 70px; }
 .tw-date { font-size: 11px; color: var(--muted); }
 .tw-sep { color: var(--muted); }
+.schedule-view-tabs { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.schedule-view-tabs .tab-buttons button { margin-right: 6px; }
+.schedule-view-tabs button.active { background: var(--accent); color: #000; }
+.calendar-mode { display: flex; gap: 6px; align-items: center; }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; text-align: left; }

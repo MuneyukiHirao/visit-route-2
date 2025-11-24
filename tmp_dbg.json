@@ -1,0 +1,118 @@
+{
+  "status": "success",
+  "dates": [
+    "2025-11-23",
+    "2025-11-24",
+    "2025-11-25"
+  ],
+  "schedules": [
+    {
+      "status": "success",
+      "date": "2025-11-23",
+      "routes": [
+        {
+          "driver_id": "A",
+          "stops": [
+            {
+              "target_id": "T001",
+              "arrival_min": 480.0,
+              "depart_min": 540.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T002",
+              "arrival_min": 540.0,
+              "depart_min": 600.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T003",
+              "arrival_min": 600.0,
+              "depart_min": 660.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T004",
+              "arrival_min": 660.0,
+              "depart_min": 720.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T005",
+              "arrival_min": 720.0,
+              "depart_min": 780.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T006",
+              "arrival_min": 780.0,
+              "depart_min": 840.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T007",
+              "arrival_min": 840.0,
+              "depart_min": 900.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T008",
+              "arrival_min": 900.0,
+              "depart_min": 960.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T009",
+              "arrival_min": 960.0,
+              "depart_min": 1020.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T010",
+              "arrival_min": 1020.0,
+              "depart_min": 1080.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            },
+            {
+              "target_id": "T011",
+              "arrival_min": 1080.0,
+              "depart_min": 1140.0,
+              "travel_minutes": 0.0,
+              "stay_minutes": 60.0
+            }
+          ],
+          "travel_minutes": 0.0,
+          "stay_minutes": 660.0,
+          "end_time": 1140.0,
+          "overtime_minutes": 0.0,
+          "return_travel_minutes": 0.0
+        }
+      ],
+      "unassigned": []
+    },
+    {
+      "status": "success",
+      "date": "2025-11-24",
+      "routes": [],
+      "unassigned": []
+    },
+    {
+      "status": "success",
+      "date": "2025-11-25",
+      "routes": [],
+      "unassigned": []
+    }
+  ],
+  "unassigned": [],
+  "warnings": []
+}
